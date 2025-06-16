@@ -1,0 +1,530 @@
+# API Documentation
+
+## Advanced Fraud Detection API v1.0
+
+This document provides comprehensive documentation for the Advanced Fraud Detection REST API.
+
+## Base URL
+
+```
+http://localhost:5000/api/v1
+```
+
+## Authentication
+
+Currently, the API does not require authentication. In production, implement proper API key or JWT token authentication.
+
+## Rate Limiting
+
+- **Development**: No limits
+- **Production**: 1000 requests per minute per IP
+
+## Response Format
+
+All API responses follow a consistent JSON format:
+
+```json
+{
+    "status": "success|error|service_unavailable",
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "data": {...},
+    "error": "Error message (if applicable)"
+}
+```
+
+## Endpoints
+
+### 1. Health Check
+
+Check API health and system status.
+
+**Endpoint:** `GET /health`
+
+**Response:**
+```json
+{
+    "status": "healthy",
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "version": "2.0.0",
+    "uptime_seconds": 3600,
+    "model_loaded": true,
+    "api_stats": {
+        "requests_total": 1250,
+        "requests_successful": 1200,
+        "requests_failed": 50,
+        "avg_response_time": 0.045
+    }
+}
+```
+
+**Status Codes:**
+- `200`: System healthy
+- `503`: System degraded (model not loaded)
+
+---
+
+### 2. Score Transaction
+
+Score a single transaction for fraud probability.
+
+**Endpoint:** `POST /api/v1/score`
+
+**Request Body:**
+```json
+{
+    "Amount": 150.00,
+    "V1": -1.359807,
+    "V2": -0.072781,
+    "V3": 2.536347,
+    "V4": 1.378155,
+    "V5": -0.338321,
+    "V6": 0.462388,
+    "V7": 0.239599,
+    "V8": 0.098698,
+    "V9": 0.363787,
+    "V10": 0.090794
+}
+```
+
+**Response:**
+```json
+{
+    "fraud_probability": 0.234,
+    "uncertainty": 0.124,
+    "confidence": 0.876,
+    "risk_level": "LOW",
+    "recommendation": "APPROVE",
+    "risk_factors": [],
+    "model_scores": {
+        "logistic": 0.156,
+        "random_forest": 0.289,
+        "isolation_forest": 0.257
+    },
+    "feature_count": 29,
+    "system_version": "2.0.0",
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "status": "success"
+}
+```
+
+**Status Codes:**
+- `200`: Successful scoring
+- `400`: Invalid request data
+- `503`: Model not available
+
+**Risk Levels:**
+- `VERY_LOW`: < 0.3 probability
+- `LOW`: 0.3 - 0.6 probability  
+- `MEDIUM`: 0.6 - 0.8 probability
+- `HIGH`: > 0.8 probability
+
+**Recommendations:**
+- `APPROVE`: Allow transaction
+- `REVIEW`: Manual review required
+- `BLOCK`: Deny transaction
+
+---
+
+### 3. Batch Score Transactions
+
+Score multiple transactions in a single request.
+
+**Endpoint:** `POST /api/v1/batch_score`
+
+**Request Body:**
+```json
+{
+    "transactions": [
+        {
+            "Amount": 150.00,
+            "V1": -1.359807,
+            "V2": -0.072781
+        },
+        {
+            "Amount": 75.50,
+            "V1": 0.234567,
+            "V2": 1.456789
+        }
+    ]
+}
+```
+
+**Response:**
+```json
+{
+    "batch_results": [
+        {
+            "transaction_index": 0,
+            "fraud_probability": 0.234,
+            "risk_level": "LOW",
+            "recommendation": "APPROVE",
+            "status": "success"
+        },
+        {
+            "transaction_index": 1,
+            "fraud_probability": 0.678,
+            "risk_level": "MEDIUM",
+            "recommendation": "REVIEW",
+            "status": "success"
+        }
+    ],
+    "summary": {
+        "total_transactions": 2,
+        "successful_transactions": 2,
+        "failed_transactions": 0,
+        "avg_fraud_probability": 0.456,
+        "high_risk_count": 0,
+        "medium_risk_count": 1,
+        "low_risk_count": 1
+    },
+    "status": "success",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+**Limitations:**
+- Maximum 100 transactions per batch
+- Individual transaction failures don't affect the batch
+
+---
+
+### 4. Model Information
+
+Get information about the loaded fraud detection model.
+
+**Endpoint:** `GET /api/v1/model/info`
+
+**Response:**
+```json
+{
+    "version": "2.0.0",
+    "is_trained": true,
+    "feature_count": 29,
+    "model_count": 3,
+    "available_models": ["logistic", "random_forest", "isolation_forest"],
+    "config": {
+        "embedding_dim": 8,
+        "autoencoder_dim": 5,
+        "ensemble_models": ["logistic", "random_forest", "isolation_forest"]
+    },
+    "feature_names": ["embed_0", "embed_1", "ae_0", "Amount", "V1"],
+    "system_status": "operational",
+    "api_version": "1.0",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+---
+
+### 5. Feature Importance
+
+Get feature importance rankings from the model.
+
+**Endpoint:** `GET /api/v1/model/features`
+
+**Response:**
+```json
+{
+    "feature_importance": {
+        "V14": 0.0847,
+        "V4": 0.0623,
+        "V11": 0.0531,
+        "V2": 0.0498,
+        "V21": 0.0445,
+        "V16": 0.0389,
+        "V10": 0.0367,
+        "V3": 0.0334,
+        "Amount_log": 0.0312,
+        "V12": 0.0298
+    },
+    "feature_count": 29,
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "status": "success"
+}
+```
+
+---
+
+### 6. Explain Prediction
+
+Get detailed explanation for a fraud prediction.
+
+**Endpoint:** `POST /api/v1/explain`
+
+**Request Body:**
+```json
+{
+    "Amount": 150.00,
+    "V1": -1.359807,
+    "V2": -0.072781,
+    "V3": 2.536347
+}
+```
+
+**Response:**
+```json
+{
+    "fraud_probability": 0.234,
+    "risk_level": "LOW",
+    "recommendation": "APPROVE",
+    "explanation": {
+        "top_features": [
+            ["V14", 0.0847],
+            ["V4", 0.0623],
+            ["V11", 0.0531]
+        ],
+        "risk_factors": [
+            "High transaction amount: $150.00"
+        ],
+        "model_contributions": {
+            "logistic": 0.156,
+            "random_forest": 0.289,
+            "isolation_forest": 0.257
+        },
+        "confidence": 0.876,
+        "uncertainty": 0.124
+    },
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "status": "success"
+}
+```
+
+---
+
+### 7. API Statistics
+
+Get API usage statistics.
+
+**Endpoint:** `GET /api/v1/stats`
+
+**Response:**
+```json
+{
+    "api_statistics": {
+        "requests_total": 1250,
+        "requests_successful": 1200,
+        "requests_failed": 50,
+        "avg_response_time": 0.045,
+        "start_time": "2024-01-01T10:00:00.000Z"
+    },
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "status": "success"
+}
+```
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+    "error": "Error type",
+    "message": "Detailed error message",
+    "status": "error|bad_request|service_unavailable",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+### Common Error Codes
+
+| Status Code | Error Type | Description |
+|-------------|------------|-------------|
+| 400 | Bad Request | Invalid request format or data |
+| 404 | Not Found | Endpoint not found |
+| 500 | Internal Server Error | Server-side error |
+| 503 | Service Unavailable | Model not loaded or system degraded |
+
+### Example Error Responses
+
+**Validation Error (400):**
+```json
+{
+    "error": "Validation error",
+    "message": "Missing required field: Amount",
+    "status": "bad_request",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+**Service Unavailable (503):**
+```json
+{
+    "error": "Fraud detection model not available",
+    "status": "service_unavailable",
+    "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+## Usage Examples
+
+### Python Example
+
+```python
+import requests
+import json
+
+# Score a single transaction
+url = "http://localhost:5000/api/v1/score"
+transaction = {
+    "Amount": 150.00,
+    "V1": -1.359807,
+    "V2": -0.072781,
+    "V3": 2.536347
+}
+
+response = requests.post(url, json=transaction)
+result = response.json()
+
+print(f"Fraud Probability: {result['fraud_probability']:.3f}")
+print(f"Recommendation: {result['recommendation']}")
+```
+
+### JavaScript Example
+
+```javascript
+// Score a transaction using fetch
+const scoreTransaction = async (transaction) => {
+    const response = await fetch('http://localhost:5000/api/v1/score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transaction)
+    });
+    
+    const result = await response.json();
+    return result;
+};
+
+// Usage
+const transaction = {
+    Amount: 150.00,
+    V1: -1.359807,
+    V2: -0.072781
+};
+
+scoreTransaction(transaction)
+    .then(result => {
+        console.log(`Fraud Probability: ${result.fraud_probability}`);
+        console.log(`Recommendation: ${result.recommendation}`);
+    });
+```
+
+### cURL Example
+
+```bash
+# Score a transaction
+curl -X POST http://localhost:5000/api/v1/score \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Amount": 150.00,
+    "V1": -1.359807,
+    "V2": -0.072781,
+    "V3": 2.536347
+  }'
+
+# Check API health
+curl http://localhost:5000/health
+```
+
+## Performance
+
+### Response Times
+
+- **Single Transaction**: < 50ms (p95)
+- **Batch (10 transactions)**: < 200ms (p95)
+- **Batch (100 transactions)**: < 1000ms (p95)
+
+### Throughput
+
+- **Single Requests**: 1000+ requests/second
+- **Batch Requests**: 100+ batches/second
+
+### Resource Requirements
+
+- **Memory**: 512MB minimum, 1GB recommended
+- **CPU**: 1 core minimum, 2+ cores recommended
+- **Storage**: 100MB for model files
+
+## Monitoring
+
+### Health Monitoring
+
+Monitor the `/health` endpoint:
+- Response time should be < 100ms
+- Status should be "healthy"
+- Model should be loaded
+
+### Key Metrics
+
+1. **Request Rate**: Requests per second
+2. **Error Rate**: Failed requests percentage
+3. **Response Time**: p50, p95, p99 latencies
+4. **Model Performance**: Fraud detection rate
+5. **System Resources**: CPU, memory usage
+
+### Alerts
+
+Set up alerts for:
+- Error rate > 5%
+- Response time > 200ms (p95)
+- Health check failures
+- Model not loaded
+
+## Security
+
+### Recommendations
+
+1. **Authentication**: Implement API key or JWT tokens
+2. **Rate Limiting**: Prevent abuse
+3. **HTTPS**: Use TLS in production
+4. **Input Validation**: Validate all inputs
+5. **Logging**: Log security events
+6. **Network**: Use firewalls and VPNs
+
+### Data Privacy
+
+- No sensitive data is logged
+- Transactions are not stored
+- Model predictions are stateless
+- Comply with GDPR/PCI DSS requirements
+
+## Deployment
+
+### Environment Variables
+
+```bash
+# Required
+FRAUD_MODEL_PATH=/path/to/model.pkl
+
+# Optional
+DEBUG=false
+HOST=0.0.0.0
+PORT=5000
+LOG_LEVEL=INFO
+```
+
+### Docker Deployment
+
+```bash
+# Build image
+docker build -t fraud-detection-api .
+
+# Run container
+docker run -d \
+  -p 5000:5000 \
+  -e FRAUD_MODEL_PATH=/app/models/fraud_detector.pkl \
+  -v /host/models:/app/models \
+  fraud-detection-api
+```
+
+### Kubernetes Deployment
+
+See `deployment/kubernetes/` directory for manifests.
+
+## Support
+
+For technical support or questions:
+- **Documentation**: Check the docs/ directory
+- **Issues**: GitHub issue tracker
+- **Email**: your.email@domain.com
