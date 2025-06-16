@@ -1,21 +1,3 @@
-"""
-Production-Ready Fraud Detection API
-
-A Flask-based REST API for real-time fraud detection using the
-Advanced AI Fraud Detection System.
-
-Features:
-- Real-time transaction scoring
-- Batch processing capabilities
-- Health monitoring
-- Comprehensive error handling
-- Rate limiting and security
-- Detailed logging and metrics
-
-Author: Your Name
-License: MIT
-"""
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
